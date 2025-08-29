@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MatrixMind</title>
+    <!-- VK Bridge -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-light: #f3f4f6;
+            --text-light: #1f2937;
+            --card-bg-light: #ffffff;
+            --border-light: #e5e7eb;
+            --primary-light: #3b82f6;
+            --primary-hover-light: #2563eb;
+            --locked-bg-light: #e5e7eb;
+            --locked-text-light: #9ca3af;
+            --success-light: #4ade80;
+
+            --bg-dark: #111827;
+            --text-dark: #f9fafb;
+            --card-bg-dark: #1f2937;
+            --border-dark: #374151;
+            --primary-dark: #60a5fa;
+            --primary-hover-dark: #3b82f6;
+            --locked-bg-dark: #374151;
+            --locked-text-dark: #6b7280;
+            --success-dark: #4ade80;
+        }
+
+        html.dark {
+            --bg-light: var(--bg-dark);
+            --text-light: var(--text-dark);
+            --card-bg-light: var(--card-bg-dark);
+            --border-light: var(--border-dark);
+            --primary-light: var(--primary-dark);
+            --primary-hover-light: var(--primary-hover-dark);
+            --locked-bg-light: var(--locked-bg-dark);
+            --locked-text-light: var(--locked-text-dark);
+            --success-light: var(--success-dark);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-light);
+            transition: background-color 0.3s, color 0.3s;
+            overscroll-behavior: none;
+        }
+
+        .screen { display: none; position: fixed; inset: 0; animation: fadeIn 0.3s ease-in-out; }
+        .screen.active { display: flex; }
+        
+        .modal { position: fixed; inset: 0; z-index: 50; }
+        .modal-backdrop { position: absolute; inset: 0; background-color: rgba(0, 0, 0, 0.5); animation: fadeIn 0.3s ease; }
+        .modal-content { position: relative; z-index: 10; background-color: var(--card-bg-light); animation: slideInUp 0.3s ease; }
+
+        .cell.selected::after, .rules-cell.selected::after { content: ''; position: absolute; inset: 5%; border: 3px solid var(--primary-light); border-radius: 50%; animation: circle-in 0.3s ease-in-out; }
+        .cell.erased, .rules-cell.erased { opacity: 0.5; }
+        .cell.error-flash { animation: error-flash 0.5s ease; }
+        html.dark .cell.error-flash { animation: error-flash-dark 0.5s ease; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes circle-in { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes error-flash { 0%, 100% { background-color: var(--card-bg-light); } 50% { background-color: rgba(239, 68, 68, 0.5); } }
+        @keyframes error-flash-dark { 0%, 100% { background-color: var(--card-bg-dark); } 50% { background-color: rgba(239, 68, 68, 0.5); } }
+        
+        .tool-active { transform: scale(1.1); box-shadow: 0 0 0 4px var(--primary-light); background-color: var(--card-bg-light) !important; }
+        .heart.lost { color: var(--locked-text-light) !important; transform: scale(0.9); }
+
+        .theme-switch-wrapper { display: flex; align-items: center; gap: 0.75rem; }
+        .theme-switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .theme-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--locked-bg-light); transition: .4s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary-light); }
+        input:checked + .slider:before { transform: translateX(22px); }
+    </style>
+</head>
+<body class="overflow-hidden">
+
+    <!-- Main Menu Screen -->
+    <div id="main-menu" class="screen active flex-col items-center justify-center p-4">
+        <div class="w-full max-w-sm mx-auto text-center">
+            <h1 class="text-5xl font-extrabold tracking-tight mb-10">MatrixMind</h1>
+            <div id="level-selection" class="grid grid-cols-2 gap-4 mb-6"></div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <button id="rules-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">Правила</button>
+                <button id="stats-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">Статистика</button>
+            </div>
+            <button id="other-games-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg mb-8" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">Другие игры</button>
+            <div class="flex justify-center">
+                <div class="theme-switch-wrapper">
+                    <span class="text-2xl">☀️</span>
+                    <label class="theme-switch"><input type="checkbox" id="theme-toggle"><span class="slider"></span></label>
+                    <span class="text-2xl">🌙</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen flex-col items-center p-2 sm:p-4">
+        <div class="w-full max-w-lg mx-auto flex flex-col h-full">
+            <div class="flex justify-between items-center p-2 mb-4">
+                <button id="pause-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg></button>
+                <div class="text-center">
+                    <h2 id="level-title" class="text-xl font-bold">Уровень 1</h2>
+                    <div id="lives-container" class="flex justify-center gap-1 mt-1"></div>
+                </div>
+                 <div class="flex items-center gap-2">
+                    <button id="hint-btn" class="relative p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-3xl">💡<span id="hint-count" class="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">3</span></button>
+                    <button id="get-hint-ad-btn" class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xl text-white" style="background-color: var(--success-light);">+</button>
+                </div>
+            </div>
+            <div class="flex-grow flex items-center justify-center w-full min-h-0 p-4"><div id="grid-wrapper" class="w-full max-w-sm aspect-square"></div></div>
+            <div class="flex justify-center items-center gap-4 p-4">
+                <button id="tool-eraser" class="p-4 rounded-full transition-all duration-200" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"></path><path d="M22 21H7"></path><path d="m5 12 5 5"></path></svg></button>
+                <button id="tool-pencil" class="p-4 rounded-full transition-all duration-200 tool-active" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Other Games Screen -->
+    <div id="other-games-screen" class="screen flex-col items-center justify-center p-4">
+        <div class="w-full max-w-sm mx-auto text-center">
+            <h1 class="text-3xl font-bold tracking-tight mb-6">Другие игры</h1>
+            <div id="other-games-container" class="grid grid-cols-3 gap-x-4 gap-y-5">
+                <!-- Game Icons will be generated by JS -->
+            </div>
+            <button id="back-to-menu-btn" class="w-full mt-6 py-3 px-4 rounded-xl font-semibold text-lg" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">Назад</button>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="pause-modal" class="modal hidden items-center justify-center"><div class="modal-backdrop"></div><div class="modal-content w-full max-w-sm m-4 p-6 rounded-2xl shadow-lg text-center"><h3 class="text-2xl font-bold mb-6">Пауза</h3><div class="flex flex-col gap-4"><button id="resume-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg text-white" style="background-color: var(--primary-light);">Продолжить</button><button id="restart-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">Заново</button><button id="menu-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">В меню</button></div></div></div>
+    <div id="win-modal" class="modal hidden items-center justify-center"><div class="modal-backdrop"></div><div class="modal-content w-full max-w-sm m-4 p-6 rounded-2xl shadow-lg text-center"><h3 class="text-2xl font-bold mb-2">Победа!</h3><p class="mb-6 text-lg">Уровень пройден!</p><div class="flex flex-col gap-4"><button id="next-level-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg text-white" style="background-color: var(--primary-light);">Следующий уровень</button><button id="win-menu-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">В меню</button></div></div></div>
+    <div id="game-over-modal" class="modal hidden items-center justify-center"><div class="modal-backdrop"></div><div class="modal-content w-full max-w-sm m-4 p-6 rounded-2xl shadow-lg text-center"><h3 class="text-2xl font-bold mb-2">Поражение</h3><p class="mb-6 text-lg">Жизни закончились. Попробуйте снова!</p><div class="flex flex-col gap-4"><button id="extra-life-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg text-white" style="background-color: var(--success-light);">Доп. жизнь ❤️ (Ad)</button><button id="game-over-restart-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">Заново</button><button id="game-over-menu-btn" class="w-full py-3 px-4 rounded-xl font-semibold text-lg" style="background-color: var(--card-bg-light); border: 1px solid var(--border-light);">В меню</button></div></div></div>
+    <div id="rules-modal" class="modal hidden items-center justify-center p-4"><div class="modal-backdrop"></div><div class="modal-content w-full max-w-md p-6 rounded-2xl shadow-lg max-h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="text-2xl font-bold">Как играть</h3><button id="close-rules-btn" class="p-1 text-4xl font-bold leading-none rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">&times;</button></div><div class="overflow-y-auto space-y-4 pr-2 text-center"><div class="p-4 rounded-lg" style="background-color: var(--bg-light);"><p class="mb-3 font-semibold">Цель: Сумма в ряду должна быть 12</p><div class="flex justify-center items-center gap-2"><div id="rules-target" class="relative w-14 h-14 flex items-center justify-center text-lg font-bold rounded-md transition-colors duration-500" style="background-color: var(--locked-bg-light);">12<span id="rules-current-sum" class="absolute top-0.5 right-1 text-sm font-bold opacity-0 transition-opacity" style="color: var(--primary-light);">0</span></div><div id="rules-cell-1" class="rules-cell relative w-14 h-14 flex items-center justify-center text-xl font-semibold border rounded-md transition-all duration-300" style="border-color: var(--border-light); background-color: var(--card-bg-light);">8</div><div id="rules-cell-2" class="rules-cell relative w-14 h-14 flex items-center justify-center text-xl font-semibold border rounded-md transition-all duration-300" style="border-color: var(--border-light); background-color: var(--card-bg-light);">4</div><div id="rules-cell-3" class="rules-cell relative w-14 h-14 flex items-center justify-center text-xl font-semibold border rounded-md transition-all duration-300" style="border-color: var(--border-light); background-color: var(--card-bg-light);">5</div></div></div><div class="space-y-3 text-left"><div id="rules-step-1" class="flex items-center gap-3 p-2 rounded-lg opacity-50 transition-all duration-500"><div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-white" style="background-color: var(--primary-light);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg></div><div><h4 class="font-bold">Выберите числа</h4><p class="text-sm">Нажмите на ячейки (✏️), чтобы их сумма совпала с целевым значением.</p></div></div><div id="rules-step-2" class="flex items-center gap-3 p-2 rounded-lg opacity-50 transition-all duration-500"><div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-white" style="background-color: var(--primary-light);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"></path><path d="M22 21H7"></path></svg></div><div><h4 class="font-bold">Сотрите лишнее</h4><p class="text-sm">Используйте ластик (🧼), чтобы убрать числа, не входящие в решение.</p></div></div><div id="rules-step-3" class="flex items-center gap-3 p-2 rounded-lg opacity-50 transition-all duration-500"><div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-white" style="background-color: var(--success-light);"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></div><div><h4 class="font-bold">Победа!</h4><p class="text-sm">Когда все нужные числа выбраны, а ненужные стерты, уровень пройден.</p></div></div></div></div></div></div>
+    <div id="stats-modal" class="modal hidden items-center justify-center p-4"><div class="modal-backdrop"></div><div class="modal-content w-full max-w-md p-6 rounded-2xl shadow-lg max-h-[90vh] flex flex-col"><div class="flex justify-between items-center mb-4"><h3 class="text-2xl font-bold">Статистика</h3><button id="close-stats-btn" class="p-1 text-4xl font-bold leading-none rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">&times;</button></div><div id="stats-content" class="overflow-y-auto space-y-4 pr-2"></div></div></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // VK Bridge Init
+            vkBridge.send('VKWebAppInit');
+
+            const screens = { mainMenu: document.getElementById('main-menu'), game: document.getElementById('game-screen'), otherGames: document.getElementById('other-games-screen') };
+            const modals = { pause: document.getElementById('pause-modal'), win: document.getElementById('win-modal'), rules: document.getElementById('rules-modal'), stats: document.getElementById('stats-modal'), gameOver: document.getElementById('game-over-modal') };
+            const levelSelectionContainer = document.getElementById('level-selection');
+            const gridWrapper = document.getElementById('grid-wrapper');
+            const livesContainer = document.getElementById('lives-container');
+            const levelTitle = document.getElementById('level-title');
+            const statsContent = document.getElementById('stats-content');
+            const themeToggle = document.getElementById('theme-toggle');
+            const hintCountEl = document.getElementById('hint-count');
+            
+            const INITIAL_LIVES = 2;
+            const INITIAL_HINTS = 3;
+
+            let vkUserId = null;
+
+            let gameState = {
+                currentTool: 'pencil',
+                currentLevel: { size: 0, grid: [], solution: [], rowSums: [], colSums: [], playerGrid: [], erasedGrid: [], lives: INITIAL_LIVES, hints: INITIAL_HINTS, levelNumber: 1, },
+                gameData: { 
+                    theme: 'light', 
+                    levels: { 
+                        '4': { completed: 0, unlocked: true }, '5': { completed: 0, unlocked: true },
+                        '6': { completed: 0, unlocked: true }, '7': { completed: 0, unlocked: true },
+                        '8': { completed: 0, unlocked: true }, '9': { completed: 0, unlocked: true },
+                    },
+                    levelsCompletedSinceAd: 0,
+                }
+            };
+
+            function generateLevel(size) {
+                const grid = [], solution = [], rowSums = Array(size).fill(0), colSums = Array(size).fill(0);
+                for (let r = 0; r < size; r++) {
+                    grid[r] = []; solution[r] = [];
+                    for (let c = 0; c < size; c++) {
+                        grid[r][c] = Math.floor(Math.random() * 9) + 1;
+                        solution[r][c] = Math.random() > 0.5; 
+                    }
+                }
+                for (let i = 0; i < size; i++) {
+                    if (!solution[i].some(val => val)) solution[i][Math.floor(Math.random() * size)] = true;
+                    if (!solution.map(row => row[i]).some(val => val)) solution[Math.floor(Math.random() * size)][i] = true;
+                }
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        if (solution[r][c]) {
+                            rowSums[r] += grid[r][c]; colSums[c] += grid[r][c];
+                        }
+                    }
+                }
+                gameState.currentLevel = {
+                    size, grid, solution, rowSums, colSums,
+                    playerGrid: Array(size).fill(0).map(() => Array(size).fill(false)),
+                    erasedGrid: Array(size).fill(0).map(() => Array(size).fill(false)),
+                    lives: INITIAL_LIVES, 
+                    hints: gameState.gameData.levels[size]?.hints === undefined ? INITIAL_HINTS : gameState.gameData.levels[size].hints,
+                    levelNumber: (gameState.gameData.levels[size]?.completed || 0) + 1
+                };
+            }
+
+            function renderGrid() {
+                const { size, grid, rowSums, colSums } = gameState.currentLevel;
+                gridWrapper.innerHTML = '';
+                
+                const fullGrid = document.createElement('div');
+                fullGrid.className = 'grid w-full h-full';
+                fullGrid.style.gridTemplateColumns = `1fr ${size}fr`;
+                fullGrid.style.gridTemplateRows = `1fr ${size}fr`;
+                fullGrid.style.gap = '4px';
+
+                const colHeadersContainer = document.createElement('div');
+                colHeadersContainer.className = 'grid';
+                colHeadersContainer.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+                colHeadersContainer.style.gap = '4px';
+
+                const rowHeadersContainer = document.createElement('div');
+                rowHeadersContainer.className = 'grid';
+                rowHeadersContainer.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+                rowHeadersContainer.style.gap = '4px';
+
+                const gameBoardContainer = document.createElement('div');
+                gameBoardContainer.id = 'game-board';
+                gameBoardContainer.className = 'grid rounded-lg';
+                gameBoardContainer.style.backgroundColor = 'var(--locked-bg-light)';
+                gameBoardContainer.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+                gameBoardContainer.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+                gameBoardContainer.style.gap = '1px';
+
+                for (let c = 0; c < size; c++) {
+                    const colSumDiv = document.createElement('div');
+                    colSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors aspect-square';
+                    colSumDiv.style.backgroundColor = 'var(--locked-bg-light)';
+                    const sumSpan = document.createElement('span');
+                    sumSpan.id = `col-sum-current-${c}`;
+                    sumSpan.className = 'absolute top-0 right-1 text-xs font-bold hidden';
+                    sumSpan.style.color = 'var(--primary-light)';
+                    sumSpan.textContent = '0';
+                    if (size > 7) {
+                        sumSpan.style.fontSize = '9px';
+                        sumSpan.style.top = '1px';
+                        sumSpan.style.right = '2px';
+                    }
+                    colSumDiv.innerHTML = `<span>${colSums[c]}</span>`;
+                    colSumDiv.appendChild(sumSpan);
+                    colHeadersContainer.appendChild(colSumDiv);
+                }
+
+                for (let r = 0; r < size; r++) {
+                    const rowSumDiv = document.createElement('div');
+                    rowSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors aspect-square';
+                    rowSumDiv.style.backgroundColor = 'var(--locked-bg-light)';
+                    const sumSpan = document.createElement('span');
+                    sumSpan.id = `row-sum-current-${r}`;
+                    sumSpan.className = 'absolute top-0 right-1 text-xs font-bold hidden';
+                    sumSpan.style.color = 'var(--primary-light)';
+                    sumSpan.textContent = '0';
+                    if (size > 7) {
+                        sumSpan.style.fontSize = '9px';
+                        sumSpan.style.top = '1px';
+                        sumSpan.style.right = '2px';
+                    }
+                    rowSumDiv.innerHTML = `<span>${rowSums[r]}</span>`;
+                    rowSumDiv.appendChild(sumSpan);
+                    rowHeadersContainer.appendChild(rowSumDiv);
+                }
+
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell flex items-center justify-center text-center text-xl sm:text-2xl font-semibold relative cursor-pointer transition-all aspect-square';
+                        cell.style.backgroundColor = 'var(--card-bg-light)';
+                        cell.dataset.r = r; cell.dataset.c = c;
+                        cell.textContent = grid[r][c];
+                        gameBoardContainer.appendChild(cell);
+                    }
+                }
+                
+                fullGrid.appendChild(document.createElement('div')); // Top-left empty
+                fullGrid.appendChild(colHeadersContainer);
+                fullGrid.appendChild(rowHeadersContainer);
+                fullGrid.appendChild(gameBoardContainer);
+                gridWrapper.appendChild(fullGrid);
+
+                updateSumsUI();
+            }
+            
+            function performErase(cell, r, c) {
+                gameState.currentLevel.erasedGrid[r][c] = true;
+                cell.textContent = '';
+                cell.classList.add('erased');
+                cell.classList.remove('selected');
+                updateSumsUI();
+                checkWinCondition();
+            }
+
+            function performSelect(cell, r, c) {
+                const { erasedGrid, grid } = gameState.currentLevel;
+                gameState.currentLevel.playerGrid[r][c] = true;
+                if (erasedGrid[r][c]) {
+                    erasedGrid[r][c] = false;
+                    cell.textContent = grid[r][c];
+                    cell.classList.remove('erased');
+                }
+                cell.classList.add('selected');
+                updateSumsUI();
+                checkWinCondition();
+            }
+
+            function handleCellClick(e) {
+                const cell = e.target.closest('.cell');
+                if (!cell) return;
+                const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
+                const { playerGrid, solution } = gameState.currentLevel;
+
+                if (gameState.currentTool === 'pencil') {
+                    if (playerGrid[r][c]) return;
+                    if (solution[r][c]) {
+                        performSelect(cell, r, c);
+                    } else {
+                        loseLife();
+                        cell.classList.add('error-flash');
+                        setTimeout(() => cell.classList.remove('error-flash'), 500);
+                    }
+                } else if (gameState.currentTool === 'eraser') {
+                    if (playerGrid[r][c]) return;
+                    if (solution[r][c]) {
+                        loseLife();
+                        cell.classList.add('error-flash');
+                        setTimeout(() => cell.classList.remove('error-flash'), 500);
+                    } else {
+                        performErase(cell, r, c);
+                    }
+                }
+            }
+
+            function handleHintClick() {
+                if (gameState.currentLevel.hints <= 0) return;
+
+                const { solution, playerGrid, erasedGrid, size } = gameState.currentLevel;
+                const availableActions = [];
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        if (solution[r][c] && !playerGrid[r][c]) {
+                            availableActions.push({ r, c, type: 'select' });
+                        } else if (!solution[r][c] && !erasedGrid[r][c]) {
+                            availableActions.push({ r, c, type: 'erase' });
+                        }
+                    }
+                }
+
+                if (availableActions.length > 0) {
+                    gameState.currentLevel.hints--;
+                    updateHintCount();
+                    saveGameData();
+                    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
+                    const cellEl = document.querySelector(`.cell[data-r='${action.r}'][data-c='${action.c}']`);
+                    if (cellEl) {
+                        if (action.type === 'select') {
+                            performSelect(cellEl, action.r, action.c);
+                        } else {
+                            performErase(cellEl, action.r, action.c);
+                        }
+                    }
+                }
+            }
+            
+            function updateSumsUI() {
+                const { size, grid, playerGrid, erasedGrid, rowSums, colSums, solution } = gameState.currentLevel;
+                
+                for(let i = 0; i < size; i++) {
+                    let currentRowSum = 0;
+                    let isRowComplete = true;
+                    for(let c = 0; c < size; c++) {
+                        if (playerGrid[i][c]) currentRowSum += grid[i][c];
+                        if (solution[i][c] && !playerGrid[i][c]) isRowComplete = false;
+                        if (!solution[i][c] && !erasedGrid[i][c]) isRowComplete = false;
+                    }
+
+                    let currentColSum = 0;
+                    let isColComplete = true;
+                    for(let r = 0; r < size; r++) {
+                        if (playerGrid[r][i]) currentColSum += grid[r][i];
+                        if (solution[r][i] && !playerGrid[r][i]) isColComplete = false;
+                        if (!solution[r][i] && !erasedGrid[r][i]) isColComplete = false;
+                    }
+
+                    const rowSumEl = document.getElementById(`row-sum-current-${i}`);
+                    const colSumEl = document.getElementById(`col-sum-current-${i}`);
+                    if (!rowSumEl || !colSumEl) continue;
+                    
+                    const rowTargetEl = rowSumEl.parentElement;
+                    const colTargetEl = colSumEl.parentElement;
+
+                    rowSumEl.textContent = currentRowSum;
+                    rowSumEl.classList.toggle('hidden', currentRowSum === 0);
+                    colSumEl.textContent = currentColSum;
+                    colSumEl.classList.toggle('hidden', currentColSum === 0);
+                    
+                    if(rowTargetEl) rowTargetEl.style.backgroundColor = (currentRowSum === rowSums[i] && isRowComplete) ? 'var(--success-light)' : 'var(--locked-bg-light)';
+                    if(colTargetEl) colTargetEl.style.backgroundColor = (currentColSum === colSums[i] && isColComplete) ? 'var(--success-light)' : 'var(--locked-bg-light)';
+                }
+            }
+            
+            function checkWinCondition() {
+                const { playerGrid, erasedGrid, solution, size } = gameState.currentLevel;
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        if (solution[r][c] !== playerGrid[r][c]) return;
+                        if (!solution[r][c] && !erasedGrid[r][c]) return;
+                    }
+                }
+                
+                const currentSize = gameState.currentLevel.size;
+                gameState.gameData.levels[currentSize].completed++;
+                gameState.gameData.levelsCompletedSinceAd++;
+
+                if (gameState.gameData.levelsCompletedSinceAd >= 4) {
+                    vkBridge.send('VKWebAppShowInterstitialAd').catch(e => console.log("Interstitial Ad error", e));
+                    gameState.gameData.levelsCompletedSinceAd = 0;
+                }
+
+                saveGameData();
+                setTimeout(() => showModal('win'), 300);
+            }
+
+            function renderLives() {
+                livesContainer.innerHTML = '';
+                const maxLives = Math.max(INITIAL_LIVES, gameState.currentLevel.lives);
+                for (let i = 0; i < maxLives; i++) {
+                    const heart = document.createElement('span');
+                    heart.className = 'heart text-2xl transition-all duration-300';
+                    if (i < gameState.currentLevel.lives) {
+                        heart.classList.add('active', 'text-red-500');
+                        heart.innerHTML = '❤️';
+                    } else {
+                        heart.classList.add('lost');
+                        heart.innerHTML = '🖤';
+                    }
+                    livesContainer.appendChild(heart);
+                }
+            }
+
+            function loseLife() {
+                if (gameState.currentLevel.lives <= 0) return;
+                gameState.currentLevel.lives--;
+                renderLives();
+                if (gameState.currentLevel.lives === 0) {
+                    setTimeout(() => showModal('gameOver'), 500);
+                }
+            }
+
+            async function getReward(type) {
+                try {
+                    await vkBridge.send('VKWebAppCheckNativeAds', { ad_format: 'reward' });
+                    const adData = await vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'reward' });
+                    if (adData.result) {
+                        if (type === 'life') {
+                            gameState.currentLevel.lives++;
+                            renderLives();
+                            showModal('gameOver', false);
+                        } else if (type === 'hint') {
+                            gameState.currentLevel.hints++;
+                            updateHintCount();
+                            saveGameData();
+                        }
+                    }
+                } catch (e) {
+                    console.error("Rewarded ad error:", e);
+                }
+            }
+
+            function showScreen(screenName) { 
+                Object.values(screens).forEach(s => s.classList.remove('active')); 
+                screens[screenName].classList.add('active'); 
+                vkBridge.send('VKWebAppShowBannerAd', { banner_location: 'bottom' }).catch(e => {});
+            }
+            function showModal(modalName, show = true) { 
+                modals[modalName].classList.toggle('hidden', !show); 
+                modals[modalName].classList.toggle('flex', show); 
+            }
+
+            function renderMenu() {
+                levelSelectionContainer.innerHTML = '';
+                Object.entries(gameState.gameData.levels).forEach(([size, data]) => {
+                    const button = document.createElement('button');
+                    button.dataset.size = size;
+                    button.className = 'level-btn w-full py-4 rounded-xl font-bold text-lg text-white transition-transform hover:scale-105';
+                    button.style.backgroundColor = 'var(--primary-light)';
+                    button.textContent = `${size}x${size}`;
+                    levelSelectionContainer.appendChild(button);
+                });
+            }
+            
+            function renderStats() {
+                statsContent.innerHTML = '';
+                 Object.entries(gameState.gameData.levels).forEach(([size, data]) => {
+                    statsContent.innerHTML += `<div class="p-4 rounded-lg" style="background-color: var(--bg-light);"><h4 class="text-xl font-bold">${size}x${size}</h4><p>Пройдено раз: <span class="font-semibold">${data.completed}</span></p></div>`;
+                });
+            }
+            
+            function renderOtherGames() {
+                const container = document.getElementById('other-games-container');
+                container.innerHTML = '';
+                const games = [
+                    { name: 'Bubble Shooter', appId: 54051411, icon: 'icon1.png' },
+                    { name: 'Тетрис', appId: 54051413, icon: 'icon2.png' },
+                    { name: 'Tower Blocks', appId: 53962513, icon: 'icon3.png' },
+                    { name: 'Блок Про', appId: 53936296, icon: 'icon4.png' },
+                    { name: 'Филворды', appId: 53867134, icon: 'icon5.png' },
+                    { name: 'Словли', appId: 53861990, icon: 'icon6.png' },
+                    { name: 'Brick Balls', appId: 54023580, icon: 'icon7.png' },
+                    { name: '2048', appId: 53965380, icon: 'icon8.png' },
+                    { name: 'Math Matrix', appId: 53970659, icon: 'icon9.png' }
+                ];
+
+                games.forEach(game => {
+                    const gameEl = document.createElement('div');
+                    gameEl.className = "flex flex-col items-center cursor-pointer group";
+                    gameEl.dataset.appId = game.appId;
+                    gameEl.innerHTML = `
+                        <div class="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-3xl mb-2 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+                           <img src="${game.icon}" alt="${game.name}" class="w-full h-full object-cover">
+                        </div>
+                        <span class="text-xs font-medium text-center">${game.name}</span>
+                    `;
+                    container.appendChild(gameEl);
+                });
+            }
+
+            function updateHintCount() { 
+                const hints = gameState.currentLevel.hints;
+                hintCountEl.textContent = hints; 
+                hintCountEl.classList.toggle('hidden', hints <= 0); 
+                if (gameState.gameData.levels[gameState.currentLevel.size]) {
+                   gameState.gameData.levels[gameState.currentLevel.size].hints = hints;
+                }
+            }
+
+            function startGame(size) {
+                generateLevel(size);
+                renderGrid();
+                levelTitle.textContent = `Уровень ${gameState.currentLevel.levelNumber}`;
+                renderLives();
+                updateHintCount();
+                showScreen('game');
+            }
+            
+            function switchTool(tool) {
+                gameState.currentTool = tool;
+                document.getElementById('tool-pencil').classList.toggle('tool-active', tool === 'pencil');
+                document.getElementById('tool-eraser').classList.toggle('tool-active', tool === 'eraser');
+            }
+            
+            function setTheme(theme) {
+                gameState.gameData.theme = theme;
+                document.documentElement.classList.toggle('dark', theme === 'dark');
+                themeToggle.checked = theme === 'dark';
+                saveGameData();
+            }
+
+            async function saveGameData() {
+                if (!vkUserId) return;
+                const storageKey = `matrixmind_data_${vkUserId}`;
+                const dataToSave = JSON.stringify(gameState.gameData);
+                try {
+                    await vkBridge.send('VKWebAppStorageSet', { key: storageKey, value: dataToSave });
+                } catch (error) {
+                    localStorage.setItem(storageKey, dataToSave); // Fallback
+                }
+            }
+
+            async function loadGameData() {
+                if (!vkUserId) return;
+                const storageKey = `matrixmind_data_${vkUserId}`;
+                let loadedData = null;
+                try {
+                    const response = await vkBridge.send('VKWebAppStorageGet', { keys: [storageKey] });
+                    if (response.keys[0]?.value) {
+                        loadedData = JSON.parse(response.keys[0].value);
+                    }
+                } catch (error) {
+                    const localData = localStorage.getItem(storageKey); // Fallback
+                    if (localData) { loadedData = JSON.parse(localData); }
+                }
+
+                if (loadedData) {
+                     const defaultLevels = { 
+                        '4': { completed: 0, unlocked: true, hints: INITIAL_HINTS }, '5': { completed: 0, unlocked: true, hints: INITIAL_HINTS },
+                        '6': { completed: 0, unlocked: true, hints: INITIAL_HINTS }, '7': { completed: 0, unlocked: true, hints: INITIAL_HINTS },
+                        '8': { completed: 0, unlocked: true, hints: INITIAL_HINTS }, '9': { completed: 0, unlocked: true, hints: INITIAL_HINTS },
+                    };
+                    
+                    // Merge saved level data with defaults to ensure new levels are added correctly
+                    for (const size in defaultLevels) {
+                        if (loadedData.levels && loadedData.levels[size]) {
+                            defaultLevels[size] = { ...defaultLevels[size], ...loadedData.levels[size] };
+                        }
+                    }
+                    loadedData.levels = defaultLevels;
+                    gameState.gameData = { ...gameState.gameData, ...loadedData };
+                }
+            }
+
+            let rulesAnimationTimeout;
+            function animateRules() {
+                // ... animation logic remains the same ...
+            }
+
+            // Event Listeners
+            gridWrapper.addEventListener('click', handleCellClick);
+            document.getElementById('hint-btn').addEventListener('click', handleHintClick);
+            document.getElementById('get-hint-ad-btn').addEventListener('click', () => getReward('hint'));
+            document.getElementById('tool-pencil').addEventListener('click', () => switchTool('pencil'));
+            document.getElementById('tool-eraser').addEventListener('click', () => switchTool('eraser'));
+            document.getElementById('pause-btn').addEventListener('click', () => showModal('pause'));
+            document.getElementById('resume-btn').addEventListener('click', () => showModal('pause', false));
+            document.getElementById('restart-btn').addEventListener('click', () => { showModal('pause', false); startGame(gameState.currentLevel.size); });
+            document.getElementById('menu-btn').addEventListener('click', () => { showModal('pause', false); renderMenu(); showScreen('mainMenu'); });
+            document.getElementById('next-level-btn').addEventListener('click', () => { showModal('win', false); startGame(gameState.currentLevel.size); });
+            document.getElementById('win-menu-btn').addEventListener('click', () => { showModal('win', false); renderMenu(); showScreen('mainMenu'); });
+            document.getElementById('extra-life-btn').addEventListener('click', () => getReward('life'));
+            document.getElementById('game-over-restart-btn').addEventListener('click', () => { showModal('gameOver', false); startGame(gameState.currentLevel.size); });
+            document.getElementById('game-over-menu-btn').addEventListener('click', () => { showModal('gameOver', false); renderMenu(); showScreen('mainMenu'); });
+            document.getElementById('rules-btn').addEventListener('click', () => { showModal('rules'); });
+            document.getElementById('close-rules-btn').addEventListener('click', () => { showModal('rules', false); });
+            modals.rules.querySelector('.modal-backdrop').addEventListener('click', () => { showModal('rules', false); });
+            document.getElementById('stats-btn').addEventListener('click', () => { renderStats(); showModal('stats'); });
+            document.getElementById('close-stats-btn').addEventListener('click', () => showModal('stats', false));
+            modals.stats.querySelector('.modal-backdrop').addEventListener('click', () => showModal('stats', false));
+            themeToggle.addEventListener('change', () => setTheme(themeToggle.checked ? 'dark' : 'light'));
+            levelSelectionContainer.addEventListener('click', e => { const button = e.target.closest('.level-btn'); if (button) startGame(parseInt(button.dataset.size)); });
+            document.getElementById('other-games-btn').addEventListener('click', () => showScreen('otherGames'));
+            document.getElementById('back-to-menu-btn').addEventListener('click', () => showScreen('mainMenu'));
+            document.getElementById('other-games-container').addEventListener('click', e => {
+                const gameEl = e.target.closest('[data-app-id]');
+                if (gameEl) {
+                    const appId = parseInt(gameEl.dataset.appId);
+                    vkBridge.send('VKWebAppOpenApp', { app_id: appId });
+                }
+            });
+
+            async function init() { 
+                try {
+                    const user = await vkBridge.send('VKWebAppGetUserInfo');
+                    vkUserId = user.id;
+                } catch (error) {
+                    // Fallback for testing outside VK
+                    vkUserId = 'test_user_123';
+                }
+                await loadGameData(); 
+                setTheme(gameState.gameData.theme); 
+                renderMenu(); 
+                renderOtherGames();
+                showScreen('mainMenu'); 
+            }
+            init();
+        });
+    </script>
+</body>
+</html>
+
