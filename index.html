@@ -683,7 +683,7 @@
                 }
             });
 
-            async function init() { 
+            async function initVKData() {
                 try {
                     const user = await vkBridge.send('VKWebAppGetUserInfo');
                     vkUserId = user.id;
@@ -692,16 +692,25 @@
                     vkUserId = 'test_user_123';
                 }
                 await loadGameData(); 
-                setTheme(gameState.gameData.theme); 
+                // Re-render menu with loaded data
+                renderMenu();
+            }
+
+            function init() { 
+                // Render UI immediately with default/local data
                 renderMenu(); 
                 renderOtherGames();
+                // Load theme from localStorage sync first for fast load
+                const savedTheme = localStorage.getItem('matrixMindTheme');
+                setTheme(savedTheme || gameState.gameData.theme); 
                 showScreen('mainMenu'); 
+
+                // Start async VK data loading
+                initVKData();
             }
             init();
         });
     </script>
 </body>
 </html>
-
-
 
