@@ -114,9 +114,8 @@
                     <h2 id="level-title" class="text-xl font-bold">Уровень 1</h2>
                     <div id="lives-container" class="flex justify-center gap-1 mt-1"></div>
                 </div>
-                 <div class="flex items-center gap-2">
+                 <div class="flex items-center">
                     <button id="hint-btn" class="relative p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-3xl">💡<span id="hint-count" class="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">3</span></button>
-                    <button id="get-hint-ad-btn" class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xl text-white" style="background-color: var(--success-light);">+</button>
                 </div>
             </div>
             <div class="flex-grow flex items-center justify-center w-full min-h-0 p-4"><div id="grid-wrapper" class="w-full max-w-sm aspect-square"></div></div>
@@ -215,8 +214,9 @@
                 
                 const fullGrid = document.createElement('div');
                 fullGrid.className = 'grid w-full h-full';
-                fullGrid.style.gridTemplateColumns = `1fr ${size}fr`;
-                fullGrid.style.gridTemplateRows = `1fr ${size}fr`;
+                // FIX: Changed grid layout to prevent overflow and ensure consistent cell sizing.
+                fullGrid.style.gridTemplateColumns = `max-content 1fr`;
+                fullGrid.style.gridTemplateRows = `max-content 1fr`;
                 fullGrid.style.gap = '4px';
 
                 const colHeadersContainer = document.createElement('div');
@@ -344,34 +344,40 @@
                 }
             }
 
-            function handleHintClick() {
-                if (gameState.currentLevel.hints <= 0) return;
+            function handleHintClick(e) {
+                // FIX: Remove focus from button after click to prevent "stuck" state
+                e.currentTarget.blur();
 
-                const { solution, playerGrid, erasedGrid, size } = gameState.currentLevel;
-                const availableActions = [];
-                for (let r = 0; r < size; r++) {
-                    for (let c = 0; c < size; c++) {
-                        if (solution[r][c] && !playerGrid[r][c]) {
-                            availableActions.push({ r, c, type: 'select' });
-                        } else if (!solution[r][c] && !erasedGrid[r][c]) {
-                            availableActions.push({ r, c, type: 'erase' });
+                if (gameState.currentLevel.hints > 0) {
+                    const { solution, playerGrid, erasedGrid, size } = gameState.currentLevel;
+                    const availableActions = [];
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            if (solution[r][c] && !playerGrid[r][c]) {
+                                availableActions.push({ r, c, type: 'select' });
+                            } else if (!solution[r][c] && !erasedGrid[r][c]) {
+                                availableActions.push({ r, c, type: 'erase' });
+                            }
                         }
                     }
-                }
 
-                if (availableActions.length > 0) {
-                    gameState.currentLevel.hints--;
-                    updateHintCount();
-                    saveGameData();
-                    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
-                    const cellEl = document.querySelector(`.cell[data-r='${action.r}'][data-c='${action.c}']`);
-                    if (cellEl) {
-                        if (action.type === 'select') {
-                            performSelect(cellEl, action.r, action.c);
-                        } else {
-                            performErase(cellEl, action.r, action.c);
+                    if (availableActions.length > 0) {
+                        gameState.currentLevel.hints--;
+                        updateHintCount();
+                        saveGameData();
+                        const action = availableActions[Math.floor(Math.random() * availableActions.length)];
+                        const cellEl = document.querySelector(`.cell[data-r='${action.r}'][data-c='${action.c}']`);
+                        if (cellEl) {
+                            if (action.type === 'select') {
+                                performSelect(cellEl, action.r, action.c);
+                            } else {
+                                performErase(cellEl, action.r, action.c);
+                            }
                         }
                     }
+                } else {
+                    // FIX: If no hints left, show rewarded ad
+                    getReward('hint');
                 }
             }
             
@@ -540,8 +546,17 @@
 
             function updateHintCount() { 
                 const hints = gameState.currentLevel.hints;
-                hintCountEl.textContent = hints; 
-                hintCountEl.classList.toggle('hidden', hints <= 0); 
+                hintCountEl.classList.remove('hidden');
+                
+                // FIX: Show "ad" when hints are 0
+                if (hints > 0) {
+                    hintCountEl.textContent = hints;
+                    hintCountEl.style.fontSize = '0.75rem'; // 12px
+                } else {
+                    hintCountEl.textContent = 'ad';
+                    hintCountEl.style.fontSize = '0.65rem'; // ~10px
+                }
+
                 if (gameState.gameData.levels[gameState.currentLevel.size]) {
                    gameState.gameData.levels[gameState.currentLevel.size].hints = hints;
                 }
@@ -614,13 +629,29 @@
 
             let rulesAnimationTimeout;
             function animateRules() {
+                clearTimeout(rulesAnimationTimeout);
+                const sumEl = document.getElementById('rules-current-sum');
+                const targetEl = document.getElementById('rules-target');
+                const cells = [ document.getElementById('rules-cell-1'), document.getElementById('rules-cell-2'), document.getElementById('rules-cell-3') ];
+                const steps = [ document.getElementById('rules-step-1'), document.getElementById('rules-step-2'), document.getElementById('rules-step-3') ];
+
+                const reset = () => {
+                    sumEl.textContent = '0'; sumEl.style.opacity = '0';
+                    targetEl.style.backgroundColor = 'var(--locked-bg-light)';
+                    cells.forEach(cell => { cell.classList.remove('selected', 'erased'); cell.textContent = cell.dataset.originalValue; });
+                    steps.forEach(step => { step.style.opacity = '0.5'; step.style.transform = 'scale(1)'; });
                 // ... animation logic remains the same ...
+                cells.forEach(c => { if(c) c.dataset.originalValue = c.textContent });
+                const step1 = () => { reset(); if (!document.getElementById('rules-modal').classList.contains('hidden')) { steps[0].style.opacity = '1'; steps[0].style.transform = 'scale(1.03)'; cells[0].classList.add('selected'); sumEl.textContent = '8'; sumEl.style.opacity = '1'; rulesAnimationTimeout = setTimeout(step2, 2000); } };
+                const step2 = () => { if (!document.getElementById('rules-modal').classList.contains('hidden')) { cells[1].classList.add('selected'); sumEl.textContent = '12'; rulesAnimationTimeout = setTimeout(step3, 2000); }};
+                const step3 = () => { if (!document.getElementById('rules-modal').classList.contains('hidden')) { steps[0].style.opacity = '0.5'; steps[0].style.transform = 'scale(1)'; steps[1].style.opacity = '1'; steps[1].style.transform = 'scale(1.03)'; cells[2].classList.add('erased'); cells[2].textContent = ''; rulesAnimationTimeout = setTimeout(step4, 2000); }};
+                const step4 = () => { if (!document.getElementById('rules-modal').classList.contains('hidden')) { targetEl.style.backgroundColor = 'var(--success-light)'; steps[1].style.opacity = '0.5'; steps[1].style.transform = 'scale(1)'; steps[2].style.opacity = '1'; steps[2].style.transform = 'scale(1.03)'; rulesAnimationTimeout = setTimeout(step1, 3000); }};
+                step1();
             }
 
             // Event Listeners
             gridWrapper.addEventListener('click', handleCellClick);
             document.getElementById('hint-btn').addEventListener('click', handleHintClick);
-            document.getElementById('get-hint-ad-btn').addEventListener('click', () => getReward('hint'));
             document.getElementById('tool-pencil').addEventListener('click', () => switchTool('pencil'));
             document.getElementById('tool-eraser').addEventListener('click', () => switchTool('eraser'));
             document.getElementById('pause-btn').addEventListener('click', () => showModal('pause'));
@@ -632,9 +663,11 @@
             document.getElementById('extra-life-btn').addEventListener('click', () => getReward('life'));
             document.getElementById('game-over-restart-btn').addEventListener('click', () => { showModal('gameOver', false); startGame(gameState.currentLevel.size); });
             document.getElementById('game-over-menu-btn').addEventListener('click', () => { showModal('gameOver', false); renderMenu(); showScreen('mainMenu'); });
-            document.getElementById('rules-btn').addEventListener('click', () => { showModal('rules'); });
-            document.getElementById('close-rules-btn').addEventListener('click', () => { showModal('rules', false); });
-            modals.rules.querySelector('.modal-backdrop').addEventListener('click', () => { showModal('rules', false); });
+            // FIX: Call animateRules when rules modal is opened
+            document.getElementById('rules-btn').addEventListener('click', () => { showModal('rules'); animateRules(); });
+            // FIX: Clear animation timeout when rules modal is closed
+            document.getElementById('close-rules-btn').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
+            modals.rules.querySelector('.modal-backdrop').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
             document.getElementById('stats-btn').addEventListener('click', () => { renderStats(); showModal('stats'); });
             document.getElementById('close-stats-btn').addEventListener('click', () => showModal('stats', false));
             modals.stats.querySelector('.modal-backdrop').addEventListener('click', () => showModal('stats', false));
@@ -669,4 +702,6 @@
     </script>
 </body>
 </html>
+
+
 
