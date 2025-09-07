@@ -214,9 +214,8 @@
                 
                 const fullGrid = document.createElement('div');
                 fullGrid.className = 'grid w-full h-full';
-                // FIX: Changed grid layout to prevent overflow and ensure consistent cell sizing.
-                fullGrid.style.gridTemplateColumns = `max-content 1fr`;
-                fullGrid.style.gridTemplateRows = `max-content 1fr`;
+                fullGrid.style.gridTemplateColumns = `auto 1fr`;
+                fullGrid.style.gridTemplateRows = `auto 1fr`;
                 fullGrid.style.gap = '4px';
 
                 const colHeadersContainer = document.createElement('div');
@@ -344,10 +343,35 @@
                 }
             }
 
-            function handleHintClick(e) {
-                // FIX: Remove focus from button after click to prevent "stuck" state
-                e.currentTarget.blur();
+            function handleCellClick(e) {
+                const cell = e.target.closest('.cell');
+                if (!cell) return;
+                const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
+                const { playerGrid, solution } = gameState.currentLevel;
 
+                if (gameState.currentTool === 'pencil') {
+                    if (playerGrid[r][c]) return;
+                    if (solution[r][c]) {
+                        performSelect(cell, r, c);
+                    } else {
+                        loseLife();
+                        cell.classList.add('error-flash');
+                        setTimeout(() => cell.classList.remove('error-flash'), 500);
+                    }
+                } else if (gameState.currentTool === 'eraser') {
+                    if (playerGrid[r][c]) return;
+                    if (solution[r][c]) {
+                        loseLife();
+                        cell.classList.add('error-flash');
+                        setTimeout(() => cell.classList.remove('error-flash'), 500);
+                    } else {
+                        performErase(cell, r, c);
+                    }
+                }
+            }
+
+            function handleHintClick(e) {
+                e.currentTarget.blur();
                 if (gameState.currentLevel.hints > 0) {
                     const { solution, playerGrid, erasedGrid, size } = gameState.currentLevel;
                     const availableActions = [];
@@ -376,7 +400,6 @@
                         }
                     }
                 } else {
-                    // FIX: If no hints left, show rewarded ad
                     getReward('hint');
                 }
             }
@@ -546,9 +569,9 @@
 
             function updateHintCount() { 
                 const hints = gameState.currentLevel.hints;
+                hintCountEl.textContent = hints; 
                 hintCountEl.classList.remove('hidden');
                 
-                // FIX: Show "ad" when hints are 0
                 if (hints > 0) {
                     hintCountEl.textContent = hints;
                     hintCountEl.style.fontSize = '0.75rem'; // 12px
@@ -640,12 +663,12 @@
                     targetEl.style.backgroundColor = 'var(--locked-bg-light)';
                     cells.forEach(cell => { cell.classList.remove('selected', 'erased'); cell.textContent = cell.dataset.originalValue; });
                     steps.forEach(step => { step.style.opacity = '0.5'; step.style.transform = 'scale(1)'; });
-                // ... animation logic remains the same ...
+                };
                 cells.forEach(c => { if(c) c.dataset.originalValue = c.textContent });
-                const step1 = () => { reset(); if (!document.getElementById('rules-modal').classList.contains('hidden')) { steps[0].style.opacity = '1'; steps[0].style.transform = 'scale(1.03)'; cells[0].classList.add('selected'); sumEl.textContent = '8'; sumEl.style.opacity = '1'; rulesAnimationTimeout = setTimeout(step2, 2000); } };
-                const step2 = () => { if (!document.getElementById('rules-modal').classList.contains('hidden')) { cells[1].classList.add('selected'); sumEl.textContent = '12'; rulesAnimationTimeout = setTimeout(step3, 2000); }};
-                const step3 = () => { if (!document.getElementById('rules-modal').classList.contains('hidden')) { steps[0].style.opacity = '0.5'; steps[0].style.transform = 'scale(1)'; steps[1].style.opacity = '1'; steps[1].style.transform = 'scale(1.03)'; cells[2].classList.add('erased'); cells[2].textContent = ''; rulesAnimationTimeout = setTimeout(step4, 2000); }};
-                const step4 = () => { if (!document.getElementById('rules-modal').classList.contains('hidden')) { targetEl.style.backgroundColor = 'var(--success-light)'; steps[1].style.opacity = '0.5'; steps[1].style.transform = 'scale(1)'; steps[2].style.opacity = '1'; steps[2].style.transform = 'scale(1.03)'; rulesAnimationTimeout = setTimeout(step1, 3000); }};
+                const step1 = () => { reset(); steps[0].style.opacity = '1'; steps[0].style.transform = 'scale(1.03)'; cells[0].classList.add('selected'); sumEl.textContent = '8'; sumEl.style.opacity = '1'; rulesAnimationTimeout = setTimeout(step2, 2000); };
+                const step2 = () => { cells[1].classList.add('selected'); sumEl.textContent = '12'; rulesAnimationTimeout = setTimeout(step3, 2000); };
+                const step3 = () => { steps[0].style.opacity = '0.5'; steps[0].style.transform = 'scale(1)'; steps[1].style.opacity = '1'; steps[1].style.transform = 'scale(1.03)'; cells[2].classList.add('erased'); cells[2].textContent = ''; rulesAnimationTimeout = setTimeout(step4, 2000); };
+                const step4 = () => { targetEl.style.backgroundColor = 'var(--success-light)'; steps[1].style.opacity = '0.5'; steps[1].style.transform = 'scale(1)'; steps[2].style.opacity = '1'; steps[2].style.transform = 'scale(1.03)'; rulesAnimationTimeout = setTimeout(step1, 3000); };
                 step1();
             }
 
@@ -663,9 +686,7 @@
             document.getElementById('extra-life-btn').addEventListener('click', () => getReward('life'));
             document.getElementById('game-over-restart-btn').addEventListener('click', () => { showModal('gameOver', false); startGame(gameState.currentLevel.size); });
             document.getElementById('game-over-menu-btn').addEventListener('click', () => { showModal('gameOver', false); renderMenu(); showScreen('mainMenu'); });
-            // FIX: Call animateRules when rules modal is opened
             document.getElementById('rules-btn').addEventListener('click', () => { showModal('rules'); animateRules(); });
-            // FIX: Clear animation timeout when rules modal is closed
             document.getElementById('close-rules-btn').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
             modals.rules.querySelector('.modal-backdrop').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
             document.getElementById('stats-btn').addEventListener('click', () => { renderStats(); showModal('stats'); });
@@ -683,7 +704,7 @@
                 }
             });
 
-            async function initVKData() {
+            async function init() { 
                 try {
                     const user = await vkBridge.send('VKWebAppGetUserInfo');
                     vkUserId = user.id;
@@ -692,25 +713,15 @@
                     vkUserId = 'test_user_123';
                 }
                 await loadGameData(); 
-                // Re-render menu with loaded data
-                renderMenu();
-            }
-
-            function init() { 
-                // Render UI immediately with default/local data
+                setTheme(gameState.gameData.theme); 
                 renderMenu(); 
                 renderOtherGames();
-                // Load theme from localStorage sync first for fast load
-                const savedTheme = localStorage.getItem('matrixMindTheme');
-                setTheme(savedTheme || gameState.gameData.theme); 
                 showScreen('mainMenu'); 
-
-                // Start async VK data loading
-                initVKData();
             }
             init();
         });
     </script>
 </body>
 </html>
+
 
