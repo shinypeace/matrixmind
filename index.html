@@ -216,7 +216,7 @@
                     this.errorSynth = new Tone.MonoSynth({ oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 } }).toDestination();
                     this.errorSynth.volume.value = -15;
 
-                    bgMusic.volume = 0.05; // Make background music much quieter
+                    bgMusic.volume = 0.03; // FIX: Made background music even quieter
                     this.isReady = true;
                 },
                 
@@ -226,9 +226,10 @@
                         const now = Tone.now();
                         if (sound === 'click') this.clickSynth.triggerAttackRelease('C5', '8n', now);
                         if (sound === 'win') {
-                            const notes = ['C4', 'E4', 'G4', 'C5', 'E5', 'G5'];
+                            // FIX: More pleasant win sound
+                            const notes = ['G4', 'B4', 'D5', 'G5'];
                             notes.forEach((note, i) => {
-                                this.winSynth.triggerAttackRelease(note, '16n', now + i * 0.1);
+                                this.winSynth.triggerAttackRelease(note, '8n', now + i * 0.08);
                             });
                         }
                         if (sound === 'error') this.errorSynth.triggerAttackRelease('F#3', '8n', now);
@@ -291,11 +292,11 @@
                 
                 const fullGrid = document.createElement('div');
                 fullGrid.className = 'grid w-full h-full';
-                const headerSize = size > 7 ? '1.5rem' : '2rem';
+                const headerSize = 'calc(100% / ' + (size + 1) + ')'; // Dynamic header size
                 fullGrid.style.gridTemplateColumns = `${headerSize} 1fr`;
                 fullGrid.style.gridTemplateRows = `${headerSize} 1fr`;
-                // FIX: Removed gap from the main grid container to prevent overflow
-                // fullGrid.style.gap = '4px';
+                fullGrid.style.gap = '4px';
+
 
                 const colHeadersContainer = document.createElement('div');
                 colHeadersContainer.className = 'grid';
@@ -356,7 +357,7 @@
                     }
                 }
                 
-                fullGrid.appendChild(document.createElement('div'));
+                fullGrid.appendChild(document.createElement('div')); // Empty corner
                 fullGrid.appendChild(colHeadersContainer);
                 fullGrid.appendChild(rowHeadersContainer);
                 fullGrid.appendChild(gameBoardContainer);
@@ -732,10 +733,11 @@
 
             // --- Event Listeners Setup ---
             function setupEventListeners() {
+                // FIX: Added .blur() to all click handlers to prevent "stuck" button states
                 gridWrapper.addEventListener('click', handleCellClick);
                 document.getElementById('hint-btn').addEventListener('click', handleHintClick);
-                document.getElementById('tool-pencil').addEventListener('click', () => switchTool('pencil'));
-                document.getElementById('tool-eraser').addEventListener('click', () => switchTool('eraser'));
+                document.getElementById('tool-pencil').addEventListener('click', (e) => { e.currentTarget.blur(); switchTool('pencil'); });
+                document.getElementById('tool-eraser').addEventListener('click', (e) => { e.currentTarget.blur(); switchTool('eraser'); });
                 
                 document.getElementById('pause-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('pause'); });
                 document.getElementById('resume-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('pause', false); });
@@ -746,16 +748,16 @@
                 document.getElementById('extra-life-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); getReward('life'); });
                 document.getElementById('game-over-restart-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('gameOver', false); startGame(gameState.currentLevel.size); });
                 document.getElementById('game-over-menu-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('gameOver', false); renderMenu(); showScreen('mainMenu'); });
-                document.getElementById('rules-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('rules'); animateRules(); });
-                document.getElementById('close-rules-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
+                document.getElementById('rules-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('rules'); animateRules(); });
+                document.getElementById('close-rules-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
                 modals.rules.querySelector('.modal-backdrop').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
-                document.getElementById('stats-btn').addEventListener('click', () => { audioManager.playSound('click'); renderStats(); showModal('stats'); });
-                document.getElementById('close-stats-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('stats', false); });
+                document.getElementById('stats-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); renderStats(); showModal('stats'); });
+                document.getElementById('close-stats-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('stats', false); });
                 modals.stats.querySelector('.modal-backdrop').addEventListener('click', () => { audioManager.playSound('click'); showModal('stats', false); });
-                themeToggle.addEventListener('change', () => { audioManager.playSound('click'); setTheme(themeToggle.checked ? 'dark' : 'light'); });
-                levelSelectionContainer.addEventListener('click', e => { const button = e.target.closest('.level-btn'); if (button) { audioManager.playSound('click'); startGame(parseInt(button.dataset.size)); } });
-                document.getElementById('other-games-btn').addEventListener('click', () => { audioManager.playSound('click'); showScreen('otherGames'); });
-                document.getElementById('back-to-menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showScreen('mainMenu'); });
+                themeToggle.addEventListener('change', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); setTheme(themeToggle.checked ? 'dark' : 'light'); });
+                levelSelectionContainer.addEventListener('click', e => { const button = e.target.closest('.level-btn'); if (button) { e.currentTarget.blur(); audioManager.playSound('click'); startGame(parseInt(button.dataset.size)); } });
+                document.getElementById('other-games-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showScreen('otherGames'); });
+                document.getElementById('back-to-menu-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showScreen('mainMenu'); });
                 document.getElementById('sound-toggle-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.toggleMute(); audioManager.playSound('click'); });
                 document.getElementById('other-games-container').addEventListener('click', e => {
                     const gameEl = e.target.closest('[data-app-id]');
@@ -803,3 +805,4 @@
     </script>
 </body>
 </html>
+
