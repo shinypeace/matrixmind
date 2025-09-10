@@ -207,13 +207,16 @@
                     this.clickSynth = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
                     this.clickSynth.volume.value = -20;
 
-                    this.winSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'fatsawtooth' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.3 } }).toDestination();
-                    this.winSynth.volume.value = -12;
+                    this.winSynth = new Tone.PolySynth(Tone.Synth, {
+                         oscillator: { type: 'triangle8' },
+                         envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 1 }
+                    }).toDestination();
+                    this.winSynth.volume.value = -10;
                     
                     this.errorSynth = new Tone.MonoSynth({ oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 } }).toDestination();
                     this.errorSynth.volume.value = -15;
 
-                    bgMusic.volume = 0.1; // Make background music very quiet
+                    bgMusic.volume = 0.05; // Make background music much quieter
                     this.isReady = true;
                 },
                 
@@ -222,7 +225,12 @@
                     try {
                         const now = Tone.now();
                         if (sound === 'click') this.clickSynth.triggerAttackRelease('C5', '8n', now);
-                        if (sound === 'win') this.winSynth.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '8n', now);
+                        if (sound === 'win') {
+                            const notes = ['C4', 'E4', 'G4', 'C5', 'E5', 'G5'];
+                            notes.forEach((note, i) => {
+                                this.winSynth.triggerAttackRelease(note, '16n', now + i * 0.1);
+                            });
+                        }
                         if (sound === 'error') this.errorSynth.triggerAttackRelease('F#3', '8n', now);
                     } catch(e) { console.error("Sound play error", e); }
                 },
@@ -272,7 +280,7 @@
                     playerGrid: Array(size).fill(0).map(() => Array(size).fill(false)),
                     erasedGrid: Array(size).fill(0).map(() => Array(size).fill(false)),
                     lives: INITIAL_LIVES, 
-                    hints: gameState.gameData.levels[size]?.hints === undefined ? INITIAL_HINTS : gameState.gameData.levels[size].hints,
+                    hints: INITIAL_HINTS, // Always reset hints for a new level
                     levelNumber: (gameState.gameData.levels[size]?.completed || 0) + 1
                 };
             }
@@ -309,7 +317,7 @@
 
                 for (let c = 0; c < size; c++) {
                     const colSumDiv = document.createElement('div');
-                    colSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors';
+                    colSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors aspect-square';
                     colSumDiv.style.backgroundColor = 'var(--locked-bg-light)';
                     const sumSpan = document.createElement('span');
                     sumSpan.id = `col-sum-current-${c}`;
@@ -324,7 +332,7 @@
 
                 for (let r = 0; r < size; r++) {
                     const rowSumDiv = document.createElement('div');
-                    rowSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors';
+                    rowSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors aspect-square';
                     rowSumDiv.style.backgroundColor = 'var(--locked-bg-light)';
                     const sumSpan = document.createElement('span');
                     sumSpan.id = `row-sum-current-${r}`;
@@ -639,10 +647,6 @@
                     hintCountEl.textContent = 'ad';
                     hintCountEl.style.fontSize = '0.65rem'; // ~10px
                 }
-
-                if (gameState.gameData.levels[gameState.currentLevel.size]) {
-                   gameState.gameData.levels[gameState.currentLevel.size].hints = hints;
-                }
             }
 
             function startGame(size) {
@@ -762,7 +766,7 @@
                 levelSelectionContainer.addEventListener('click', e => { const button = e.target.closest('.level-btn'); if (button) { audioManager.playSound('click'); startGame(parseInt(button.dataset.size)); } });
                 document.getElementById('other-games-btn').addEventListener('click', () => { audioManager.playSound('click'); showScreen('otherGames'); });
                 document.getElementById('back-to-menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showScreen('mainMenu'); });
-                document.getElementById('sound-toggle-btn').addEventListener('click', () => { audioManager.toggleMute(); audioManager.playSound('click'); });
+                document.getElementById('sound-toggle-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.toggleMute(); audioManager.playSound('click'); });
                 document.getElementById('other-games-container').addEventListener('click', e => {
                     const gameEl = e.target.closest('[data-app-id]');
                     if (gameEl) vkBridge.send('VKWebAppOpenApp', { app_id: parseInt(gameEl.dataset.appId) });
@@ -809,3 +813,4 @@
     </script>
 </body>
 </html>
+
