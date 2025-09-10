@@ -6,6 +6,8 @@
     <title>MatrixMind</title>
     <!-- VK Bridge -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+    <!-- Tone.js for Audio -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +23,7 @@
             --locked-bg-light: #e5e7eb;
             --locked-text-light: #9ca3af;
             --success-light: #4ade80;
+            --error-light: #f87171;
 
             --bg-dark: #111827;
             --text-dark: #f9fafb;
@@ -31,6 +34,7 @@
             --locked-bg-dark: #374151;
             --locked-text-dark: #6b7280;
             --success-dark: #4ade80;
+            --error-dark: #ef4444;
         }
 
         html.dark {
@@ -43,6 +47,7 @@
             --locked-bg-light: var(--locked-bg-dark);
             --locked-text-light: var(--locked-text-dark);
             --success-light: var(--success-dark);
+            --error-light: var(--error-dark);
         }
 
         body {
@@ -51,6 +56,7 @@
             color: var(--text-light);
             transition: background-color 0.3s, color 0.3s;
             overscroll-behavior: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .screen { display: none; position: fixed; inset: 0; animation: fadeIn 0.3s ease-in-out; }
@@ -68,8 +74,8 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideInUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes circle-in { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes error-flash { 0%, 100% { background-color: var(--card-bg-light); } 50% { background-color: rgba(239, 68, 68, 0.5); } }
-        @keyframes error-flash-dark { 0%, 100% { background-color: var(--card-bg-dark); } 50% { background-color: rgba(239, 68, 68, 0.5); } }
+        @keyframes error-flash { 0%, 100% { background-color: var(--card-bg-light); } 50% { background-color: var(--error-light); } }
+        @keyframes error-flash-dark { 0%, 100% { background-color: var(--card-bg-dark); } 50% { background-color: var(--error-dark); } }
         
         .tool-active { transform: scale(1.1); box-shadow: 0 0 0 4px var(--primary-light); background-color: var(--card-bg-light) !important; }
         .heart.lost { color: var(--locked-text-light) !important; transform: scale(0.9); }
@@ -84,6 +90,8 @@
     </style>
 </head>
 <body class="overflow-hidden">
+
+    <audio id="bg-music" loop src="music.mp3"></audio>
 
     <!-- Main Menu Screen -->
     <div id="main-menu" class="screen active flex-col items-center justify-center p-4">
@@ -109,7 +117,13 @@
     <div id="game-screen" class="screen flex-col items-center p-2 sm:p-4">
         <div class="w-full max-w-lg mx-auto flex flex-col h-full">
             <div class="flex justify-between items-center p-2 mb-4">
-                <button id="pause-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg></button>
+                <div class="flex items-center">
+                    <button id="pause-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg></button>
+                    <button id="sound-toggle-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <svg id="sound-on-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                        <svg id="sound-off-icon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+                    </button>
+                </div>
                 <div class="text-center">
                     <h2 id="level-title" class="text-xl font-bold">Уровень 1</h2>
                     <div id="lives-container" class="flex justify-center gap-1 mt-1"></div>
@@ -149,6 +163,7 @@
             // VK Bridge Init
             vkBridge.send('VKWebAppInit');
 
+            // --- DOM Elements ---
             const screens = { mainMenu: document.getElementById('main-menu'), game: document.getElementById('game-screen'), otherGames: document.getElementById('other-games-screen') };
             const modals = { pause: document.getElementById('pause-modal'), win: document.getElementById('win-modal'), rules: document.getElementById('rules-modal'), stats: document.getElementById('stats-modal'), gameOver: document.getElementById('game-over-modal') };
             const levelSelectionContainer = document.getElementById('level-selection');
@@ -158,17 +173,22 @@
             const statsContent = document.getElementById('stats-content');
             const themeToggle = document.getElementById('theme-toggle');
             const hintCountEl = document.getElementById('hint-count');
+            const bgMusic = document.getElementById('bg-music');
             
+            // --- Constants ---
             const INITIAL_LIVES = 2;
             const INITIAL_HINTS = 3;
 
+            // --- State ---
             let vkUserId = null;
+            let wasMusicPlaying = false;
 
             let gameState = {
                 currentTool: 'pencil',
                 currentLevel: { size: 0, grid: [], solution: [], rowSums: [], colSums: [], playerGrid: [], erasedGrid: [], lives: INITIAL_LIVES, hints: INITIAL_HINTS, levelNumber: 1, },
                 gameData: { 
                     theme: 'light', 
+                    isMuted: false,
                     levels: { 
                         '4': { completed: 0, unlocked: true }, '5': { completed: 0, unlocked: true },
                         '6': { completed: 0, unlocked: true }, '7': { completed: 0, unlocked: true },
@@ -178,7 +198,56 @@
                 }
             };
 
+            // --- Audio Manager ---
+            const audioManager = {
+                clickSynth: null, winSynth: null, errorSynth: null,
+                isReady: false,
+
+                init() {
+                    this.clickSynth = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+                    this.clickSynth.volume.value = -20;
+
+                    this.winSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'fatsawtooth' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.3 } }).toDestination();
+                    this.winSynth.volume.value = -12;
+                    
+                    this.errorSynth = new Tone.MonoSynth({ oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 } }).toDestination();
+                    this.errorSynth.volume.value = -15;
+
+                    bgMusic.volume = 0.1; // Make background music very quiet
+                    this.isReady = true;
+                },
+                
+                playSound(sound) {
+                    if (!this.isReady || gameState.gameData.isMuted) return;
+                    try {
+                        const now = Tone.now();
+                        if (sound === 'click') this.clickSynth.triggerAttackRelease('C5', '8n', now);
+                        if (sound === 'win') this.winSynth.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '8n', now);
+                        if (sound === 'error') this.errorSynth.triggerAttackRelease('F#3', '8n', now);
+                    } catch(e) { console.error("Sound play error", e); }
+                },
+
+                toggleMute(forceState) {
+                    const newState = (typeof forceState === 'boolean') ? forceState : !gameState.gameData.isMuted;
+                    gameState.gameData.isMuted = newState;
+
+                    document.getElementById('sound-on-icon').classList.toggle('hidden', gameState.gameData.isMuted);
+                    document.getElementById('sound-off-icon').classList.toggle('hidden', !gameState.gameData.isMuted);
+                    
+                    Tone.Master.mute = gameState.gameData.isMuted;
+
+                    if (gameState.gameData.isMuted) {
+                        bgMusic.pause();
+                    } else if (screens.game.classList.contains('active') || screens.mainMenu.classList.contains('active')) {
+                        bgMusic.play().catch(e => {});
+                    }
+                    if(typeof forceState === 'undefined') saveGameData();
+                }
+            };
+            
+            // --- Level Generation ---
             function generateLevel(size) {
+                // ... (rest of the function is unchanged)
                 const grid = [], solution = [], rowSums = Array(size).fill(0), colSums = Array(size).fill(0);
                 for (let r = 0; r < size; r++) {
                     grid[r] = []; solution[r] = [];
@@ -208,14 +277,16 @@
                 };
             }
 
+            // --- Rendering ---
             function renderGrid() {
                 const { size, grid, rowSums, colSums } = gameState.currentLevel;
                 gridWrapper.innerHTML = '';
                 
                 const fullGrid = document.createElement('div');
                 fullGrid.className = 'grid w-full h-full';
-                fullGrid.style.gridTemplateColumns = `auto 1fr`;
-                fullGrid.style.gridTemplateRows = `auto 1fr`;
+                const headerSize = size > 7 ? '1.5rem' : '2rem';
+                fullGrid.style.gridTemplateColumns = `${headerSize} 1fr`;
+                fullGrid.style.gridTemplateRows = `${headerSize} 1fr`;
                 fullGrid.style.gap = '4px';
 
                 const colHeadersContainer = document.createElement('div');
@@ -238,18 +309,14 @@
 
                 for (let c = 0; c < size; c++) {
                     const colSumDiv = document.createElement('div');
-                    colSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors aspect-square';
+                    colSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors';
                     colSumDiv.style.backgroundColor = 'var(--locked-bg-light)';
                     const sumSpan = document.createElement('span');
                     sumSpan.id = `col-sum-current-${c}`;
                     sumSpan.className = 'absolute top-0 right-1 text-xs font-bold hidden';
                     sumSpan.style.color = 'var(--primary-light)';
                     sumSpan.textContent = '0';
-                    if (size > 7) {
-                        sumSpan.style.fontSize = '9px';
-                        sumSpan.style.top = '1px';
-                        sumSpan.style.right = '2px';
-                    }
+                    if (size > 7) { sumSpan.style.fontSize = '9px'; sumSpan.style.top = '1px'; sumSpan.style.right = '2px'; }
                     colSumDiv.innerHTML = `<span>${colSums[c]}</span>`;
                     colSumDiv.appendChild(sumSpan);
                     colHeadersContainer.appendChild(colSumDiv);
@@ -257,18 +324,14 @@
 
                 for (let r = 0; r < size; r++) {
                     const rowSumDiv = document.createElement('div');
-                    rowSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors aspect-square';
+                    rowSumDiv.className = 'relative flex items-center justify-center text-lg sm:text-xl font-bold rounded-md transition-colors';
                     rowSumDiv.style.backgroundColor = 'var(--locked-bg-light)';
                     const sumSpan = document.createElement('span');
                     sumSpan.id = `row-sum-current-${r}`;
                     sumSpan.className = 'absolute top-0 right-1 text-xs font-bold hidden';
                     sumSpan.style.color = 'var(--primary-light)';
                     sumSpan.textContent = '0';
-                    if (size > 7) {
-                        sumSpan.style.fontSize = '9px';
-                        sumSpan.style.top = '1px';
-                        sumSpan.style.right = '2px';
-                    }
+                    if (size > 7) { sumSpan.style.fontSize = '9px'; sumSpan.style.top = '1px'; sumSpan.style.right = '2px'; }
                     rowSumDiv.innerHTML = `<span>${rowSums[r]}</span>`;
                     rowSumDiv.appendChild(sumSpan);
                     rowHeadersContainer.appendChild(rowSumDiv);
@@ -285,7 +348,7 @@
                     }
                 }
                 
-                fullGrid.appendChild(document.createElement('div')); // Top-left empty
+                fullGrid.appendChild(document.createElement('div'));
                 fullGrid.appendChild(colHeadersContainer);
                 fullGrid.appendChild(rowHeadersContainer);
                 fullGrid.appendChild(gameBoardContainer);
@@ -295,15 +358,18 @@
             }
             
             function performErase(cell, r, c) {
+                audioManager.playSound('click');
                 gameState.currentLevel.erasedGrid[r][c] = true;
                 cell.textContent = '';
                 cell.classList.add('erased');
                 cell.classList.remove('selected');
+                gameState.currentLevel.playerGrid[r][c] = false;
                 updateSumsUI();
                 checkWinCondition();
             }
 
             function performSelect(cell, r, c) {
+                audioManager.playSound('click');
                 const { erasedGrid, grid } = gameState.currentLevel;
                 gameState.currentLevel.playerGrid[r][c] = true;
                 if (erasedGrid[r][c]) {
@@ -320,20 +386,22 @@
                 const cell = e.target.closest('.cell');
                 if (!cell) return;
                 const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
-                const { playerGrid, solution } = gameState.currentLevel;
+                const { playerGrid, solution, erasedGrid } = gameState.currentLevel;
 
                 if (gameState.currentTool === 'pencil') {
                     if (playerGrid[r][c]) return;
                     if (solution[r][c]) {
                         performSelect(cell, r, c);
                     } else {
+                        audioManager.playSound('error');
                         loseLife();
                         cell.classList.add('error-flash');
                         setTimeout(() => cell.classList.remove('error-flash'), 500);
                     }
                 } else if (gameState.currentTool === 'eraser') {
-                    if (playerGrid[r][c]) return;
+                    if (playerGrid[r][c] || erasedGrid[r][c]) return;
                     if (solution[r][c]) {
+                        audioManager.playSound('error');
                         loseLife();
                         cell.classList.add('error-flash');
                         setTimeout(() => cell.classList.remove('error-flash'), 500);
@@ -343,69 +411,50 @@
                 }
             }
 
-            function handleCellClick(e) {
-                const cell = e.target.closest('.cell');
-                if (!cell) return;
-                const r = parseInt(cell.dataset.r), c = parseInt(cell.dataset.c);
-                const { playerGrid, solution } = gameState.currentLevel;
-
-                if (gameState.currentTool === 'pencil') {
-                    if (playerGrid[r][c]) return;
-                    if (solution[r][c]) {
-                        performSelect(cell, r, c);
-                    } else {
-                        loseLife();
-                        cell.classList.add('error-flash');
-                        setTimeout(() => cell.classList.remove('error-flash'), 500);
+            function applyRandomHint() {
+                const { solution, playerGrid, erasedGrid, size } = gameState.currentLevel;
+                const availableActions = [];
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        if (solution[r][c] && !playerGrid[r][c]) {
+                            availableActions.push({ r, c, type: 'select' });
+                        } else if (!solution[r][c] && !erasedGrid[r][c]) {
+                            availableActions.push({ r, c, type: 'erase' });
+                        }
                     }
-                } else if (gameState.currentTool === 'eraser') {
-                    if (playerGrid[r][c]) return;
-                    if (solution[r][c]) {
-                        loseLife();
-                        cell.classList.add('error-flash');
-                        setTimeout(() => cell.classList.remove('error-flash'), 500);
-                    } else {
-                        performErase(cell, r, c);
+                }
+
+                if (availableActions.length > 0) {
+                    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
+                    const cellEl = document.querySelector(`.cell[data-r='${action.r}'][data-c='${action.c}']`);
+                    if (cellEl) {
+                        if (action.type === 'select') {
+                            performSelect(cellEl, action.r, action.c);
+                        } else {
+                            performErase(cellEl, action.r, action.c);
+                        }
                     }
                 }
             }
 
-            function handleHintClick(e) {
+            async function handleHintClick(e) {
                 e.currentTarget.blur();
                 if (gameState.currentLevel.hints > 0) {
-                    const { solution, playerGrid, erasedGrid, size } = gameState.currentLevel;
-                    const availableActions = [];
-                    for (let r = 0; r < size; r++) {
-                        for (let c = 0; c < size; c++) {
-                            if (solution[r][c] && !playerGrid[r][c]) {
-                                availableActions.push({ r, c, type: 'select' });
-                            } else if (!solution[r][c] && !erasedGrid[r][c]) {
-                                availableActions.push({ r, c, type: 'erase' });
-                            }
-                        }
-                    }
-
-                    if (availableActions.length > 0) {
-                        gameState.currentLevel.hints--;
-                        updateHintCount();
-                        saveGameData();
-                        const action = availableActions[Math.floor(Math.random() * availableActions.length)];
-                        const cellEl = document.querySelector(`.cell[data-r='${action.r}'][data-c='${action.c}']`);
-                        if (cellEl) {
-                            if (action.type === 'select') {
-                                performSelect(cellEl, action.r, action.c);
-                            } else {
-                                performErase(cellEl, action.r, action.c);
-                            }
-                        }
-                    }
+                    gameState.currentLevel.hints--;
+                    updateHintCount();
+                    saveGameData();
+                    applyRandomHint();
                 } else {
-                    getReward('hint');
+                    const rewarded = await getReward('hint');
+                    if (rewarded) {
+                        applyRandomHint();
+                    }
                 }
             }
             
             function updateSumsUI() {
-                const { size, grid, playerGrid, erasedGrid, rowSums, colSums, solution } = gameState.currentLevel;
+                // ... (rest of the function is unchanged)
+                 const { size, grid, playerGrid, erasedGrid, rowSums, colSums, solution } = gameState.currentLevel;
                 
                 for(let i = 0; i < size; i++) {
                     let currentRowSum = 0;
@@ -450,6 +499,7 @@
                     }
                 }
                 
+                audioManager.playSound('win');
                 const currentSize = gameState.currentLevel.size;
                 gameState.gameData.levels[currentSize].completed++;
                 gameState.gameData.levelsCompletedSinceAd++;
@@ -464,7 +514,8 @@
             }
 
             function renderLives() {
-                livesContainer.innerHTML = '';
+                // ... (rest of the function is unchanged)
+                 livesContainer.innerHTML = '';
                 const maxLives = Math.max(INITIAL_LIVES, gameState.currentLevel.lives);
                 for (let i = 0; i < maxLives; i++) {
                     const heart = document.createElement('span');
@@ -498,28 +549,34 @@
                             gameState.currentLevel.lives++;
                             renderLives();
                             showModal('gameOver', false);
-                        } else if (type === 'hint') {
-                            gameState.currentLevel.hints++;
-                            updateHintCount();
-                            saveGameData();
                         }
+                        return true;
                     }
+                    return false;
                 } catch (e) {
                     console.error("Rewarded ad error:", e);
+                    return false;
                 }
             }
 
             function showScreen(screenName) { 
                 Object.values(screens).forEach(s => s.classList.remove('active')); 
                 screens[screenName].classList.add('active'); 
+                if (!gameState.gameData.isMuted && (screenName === 'mainMenu' || screenName === 'game')) {
+                    bgMusic.play().catch(()=>{});
+                } else {
+                    bgMusic.pause();
+                }
                 vkBridge.send('VKWebAppShowBannerAd', { banner_location: 'bottom' }).catch(e => {});
             }
+
             function showModal(modalName, show = true) { 
                 modals[modalName].classList.toggle('hidden', !show); 
                 modals[modalName].classList.toggle('flex', show); 
             }
 
             function renderMenu() {
+                // ... (rest of the function is unchanged)
                 levelSelectionContainer.innerHTML = '';
                 Object.entries(gameState.gameData.levels).forEach(([size, data]) => {
                     const button = document.createElement('button');
@@ -532,6 +589,7 @@
             }
             
             function renderStats() {
+                // ... (rest of the function is unchanged)
                 statsContent.innerHTML = '';
                  Object.entries(gameState.gameData.levels).forEach(([size, data]) => {
                     statsContent.innerHTML += `<div class="p-4 rounded-lg" style="background-color: var(--bg-light);"><h4 class="text-xl font-bold">${size}x${size}</h4><p>Пройдено раз: <span class="font-semibold">${data.completed}</span></p></div>`;
@@ -539,6 +597,7 @@
             }
             
             function renderOtherGames() {
+                // ... (rest of the function is unchanged)
                 const container = document.getElementById('other-games-container');
                 container.innerHTML = '';
                 const games = [
@@ -568,6 +627,7 @@
             }
 
             function updateHintCount() { 
+                // ... (rest of the function is unchanged)
                 const hints = gameState.currentLevel.hints;
                 hintCountEl.textContent = hints; 
                 hintCountEl.classList.remove('hidden');
@@ -595,12 +655,14 @@
             }
             
             function switchTool(tool) {
+                audioManager.playSound('click');
                 gameState.currentTool = tool;
                 document.getElementById('tool-pencil').classList.toggle('tool-active', tool === 'pencil');
                 document.getElementById('tool-eraser').classList.toggle('tool-active', tool === 'eraser');
             }
             
             function setTheme(theme) {
+                // ... (rest of the function is unchanged)
                 gameState.gameData.theme = theme;
                 document.documentElement.classList.toggle('dark', theme === 'dark');
                 themeToggle.checked = theme === 'dark';
@@ -608,6 +670,7 @@
             }
 
             async function saveGameData() {
+                // ... (rest of the function is unchanged)
                 if (!vkUserId) return;
                 const storageKey = `matrixmind_data_${vkUserId}`;
                 const dataToSave = JSON.stringify(gameState.gameData);
@@ -619,6 +682,7 @@
             }
 
             async function loadGameData() {
+                // ... (rest of the function is unchanged)
                 if (!vkUserId) return;
                 const storageKey = `matrixmind_data_${vkUserId}`;
                 let loadedData = null;
@@ -639,7 +703,6 @@
                         '8': { completed: 0, unlocked: true, hints: INITIAL_HINTS }, '9': { completed: 0, unlocked: true, hints: INITIAL_HINTS },
                     };
                     
-                    // Merge saved level data with defaults to ensure new levels are added correctly
                     for (const size in defaultLevels) {
                         if (loadedData.levels && loadedData.levels[size]) {
                             defaultLevels[size] = { ...defaultLevels[size], ...loadedData.levels[size] };
@@ -652,6 +715,7 @@
 
             let rulesAnimationTimeout;
             function animateRules() {
+                // ... (rest of the function is unchanged)
                 clearTimeout(rulesAnimationTimeout);
                 const sumEl = document.getElementById('rules-current-sum');
                 const targetEl = document.getElementById('rules-target');
@@ -672,48 +736,70 @@
                 step1();
             }
 
-            // Event Listeners
-            gridWrapper.addEventListener('click', handleCellClick);
-            document.getElementById('hint-btn').addEventListener('click', handleHintClick);
-            document.getElementById('tool-pencil').addEventListener('click', () => switchTool('pencil'));
-            document.getElementById('tool-eraser').addEventListener('click', () => switchTool('eraser'));
-            document.getElementById('pause-btn').addEventListener('click', () => showModal('pause'));
-            document.getElementById('resume-btn').addEventListener('click', () => showModal('pause', false));
-            document.getElementById('restart-btn').addEventListener('click', () => { showModal('pause', false); startGame(gameState.currentLevel.size); });
-            document.getElementById('menu-btn').addEventListener('click', () => { showModal('pause', false); renderMenu(); showScreen('mainMenu'); });
-            document.getElementById('next-level-btn').addEventListener('click', () => { showModal('win', false); startGame(gameState.currentLevel.size); });
-            document.getElementById('win-menu-btn').addEventListener('click', () => { showModal('win', false); renderMenu(); showScreen('mainMenu'); });
-            document.getElementById('extra-life-btn').addEventListener('click', () => getReward('life'));
-            document.getElementById('game-over-restart-btn').addEventListener('click', () => { showModal('gameOver', false); startGame(gameState.currentLevel.size); });
-            document.getElementById('game-over-menu-btn').addEventListener('click', () => { showModal('gameOver', false); renderMenu(); showScreen('mainMenu'); });
-            document.getElementById('rules-btn').addEventListener('click', () => { showModal('rules'); animateRules(); });
-            document.getElementById('close-rules-btn').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
-            modals.rules.querySelector('.modal-backdrop').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
-            document.getElementById('stats-btn').addEventListener('click', () => { renderStats(); showModal('stats'); });
-            document.getElementById('close-stats-btn').addEventListener('click', () => showModal('stats', false));
-            modals.stats.querySelector('.modal-backdrop').addEventListener('click', () => showModal('stats', false));
-            themeToggle.addEventListener('change', () => setTheme(themeToggle.checked ? 'dark' : 'light'));
-            levelSelectionContainer.addEventListener('click', e => { const button = e.target.closest('.level-btn'); if (button) startGame(parseInt(button.dataset.size)); });
-            document.getElementById('other-games-btn').addEventListener('click', () => showScreen('otherGames'));
-            document.getElementById('back-to-menu-btn').addEventListener('click', () => showScreen('mainMenu'));
-            document.getElementById('other-games-container').addEventListener('click', e => {
-                const gameEl = e.target.closest('[data-app-id]');
-                if (gameEl) {
-                    const appId = parseInt(gameEl.dataset.appId);
-                    vkBridge.send('VKWebAppOpenApp', { app_id: appId });
-                }
-            });
+            // --- Event Listeners Setup ---
+            function setupEventListeners() {
+                gridWrapper.addEventListener('click', handleCellClick);
+                document.getElementById('hint-btn').addEventListener('click', handleHintClick);
+                document.getElementById('tool-pencil').addEventListener('click', () => switchTool('pencil'));
+                document.getElementById('tool-eraser').addEventListener('click', () => switchTool('eraser'));
+                
+                document.getElementById('pause-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('pause'); });
+                document.getElementById('resume-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('pause', false); });
+                document.getElementById('restart-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('pause', false); startGame(gameState.currentLevel.size); });
+                document.getElementById('menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('pause', false); renderMenu(); showScreen('mainMenu'); });
+                document.getElementById('next-level-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('win', false); startGame(gameState.currentLevel.size); });
+                document.getElementById('win-menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('win', false); renderMenu(); showScreen('mainMenu'); });
+                document.getElementById('extra-life-btn').addEventListener('click', () => { audioManager.playSound('click'); getReward('life'); });
+                document.getElementById('game-over-restart-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('gameOver', false); startGame(gameState.currentLevel.size); });
+                document.getElementById('game-over-menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('gameOver', false); renderMenu(); showScreen('mainMenu'); });
+                document.getElementById('rules-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('rules'); animateRules(); });
+                document.getElementById('close-rules-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
+                modals.rules.querySelector('.modal-backdrop').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
+                document.getElementById('stats-btn').addEventListener('click', () => { audioManager.playSound('click'); renderStats(); showModal('stats'); });
+                document.getElementById('close-stats-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('stats', false); });
+                modals.stats.querySelector('.modal-backdrop').addEventListener('click', () => { audioManager.playSound('click'); showModal('stats', false); });
+                themeToggle.addEventListener('change', () => { audioManager.playSound('click'); setTheme(themeToggle.checked ? 'dark' : 'light'); });
+                levelSelectionContainer.addEventListener('click', e => { const button = e.target.closest('.level-btn'); if (button) { audioManager.playSound('click'); startGame(parseInt(button.dataset.size)); } });
+                document.getElementById('other-games-btn').addEventListener('click', () => { audioManager.playSound('click'); showScreen('otherGames'); });
+                document.getElementById('back-to-menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showScreen('mainMenu'); });
+                document.getElementById('sound-toggle-btn').addEventListener('click', () => { audioManager.toggleMute(); audioManager.playSound('click'); });
+                document.getElementById('other-games-container').addEventListener('click', e => {
+                    const gameEl = e.target.closest('[data-app-id]');
+                    if (gameEl) vkBridge.send('VKWebAppOpenApp', { app_id: parseInt(gameEl.dataset.appId) });
+                });
+            }
 
+            // --- Initialization ---
             async function init() { 
+                setupEventListeners();
+                
+                vkBridge.subscribe(e => {
+                    if (e.detail.type === 'VKWebAppViewHide') {
+                        if (!bgMusic.paused) { wasMusicPlaying = true; bgMusic.pause(); }
+                    }
+                    if (e.detail.type === 'VKWebAppViewRestore') {
+                        if (wasMusicPlaying && !gameState.gameData.isMuted) { bgMusic.play().catch(e => {}); }
+                        wasMusicPlaying = false;
+                    }
+                });
+
+                document.body.addEventListener('click', async () => {
+                    if (!audioManager.isReady) {
+                        await Tone.start();
+                        audioManager.init();
+                        audioManager.toggleMute(gameState.gameData.isMuted);
+                    }
+                }, { once: true });
+
                 try {
                     const user = await vkBridge.send('VKWebAppGetUserInfo');
                     vkUserId = user.id;
                 } catch (error) {
-                    // Fallback for testing outside VK
-                    vkUserId = 'test_user_123';
+                    vkUserId = 'test_user_123'; // Fallback
                 }
                 await loadGameData(); 
                 setTheme(gameState.gameData.theme); 
+                audioManager.toggleMute(gameState.gameData.isMuted);
                 renderMenu(); 
                 renderOtherGames();
                 showScreen('mainMenu'); 
@@ -723,5 +809,3 @@
     </script>
 </body>
 </html>
-
-
