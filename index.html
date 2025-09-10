@@ -255,7 +255,6 @@
             
             // --- Level Generation ---
             function generateLevel(size) {
-                // ... (rest of the function is unchanged)
                 const grid = [], solution = [], rowSums = Array(size).fill(0), colSums = Array(size).fill(0);
                 for (let r = 0; r < size; r++) {
                     grid[r] = []; solution[r] = [];
@@ -280,7 +279,7 @@
                     playerGrid: Array(size).fill(0).map(() => Array(size).fill(false)),
                     erasedGrid: Array(size).fill(0).map(() => Array(size).fill(false)),
                     lives: INITIAL_LIVES, 
-                    hints: INITIAL_HINTS, // Always reset hints for a new level
+                    hints: INITIAL_HINTS,
                     levelNumber: (gameState.gameData.levels[size]?.completed || 0) + 1
                 };
             }
@@ -295,7 +294,8 @@
                 const headerSize = size > 7 ? '1.5rem' : '2rem';
                 fullGrid.style.gridTemplateColumns = `${headerSize} 1fr`;
                 fullGrid.style.gridTemplateRows = `${headerSize} 1fr`;
-                fullGrid.style.gap = '4px';
+                // FIX: Removed gap from the main grid container to prevent overflow
+                // fullGrid.style.gap = '4px';
 
                 const colHeadersContainer = document.createElement('div');
                 colHeadersContainer.className = 'grid';
@@ -461,7 +461,6 @@
             }
             
             function updateSumsUI() {
-                // ... (rest of the function is unchanged)
                  const { size, grid, playerGrid, erasedGrid, rowSums, colSums, solution } = gameState.currentLevel;
                 
                 for(let i = 0; i < size; i++) {
@@ -522,7 +521,6 @@
             }
 
             function renderLives() {
-                // ... (rest of the function is unchanged)
                  livesContainer.innerHTML = '';
                 const maxLives = Math.max(INITIAL_LIVES, gameState.currentLevel.lives);
                 for (let i = 0; i < maxLives; i++) {
@@ -584,7 +582,6 @@
             }
 
             function renderMenu() {
-                // ... (rest of the function is unchanged)
                 levelSelectionContainer.innerHTML = '';
                 Object.entries(gameState.gameData.levels).forEach(([size, data]) => {
                     const button = document.createElement('button');
@@ -597,7 +594,6 @@
             }
             
             function renderStats() {
-                // ... (rest of the function is unchanged)
                 statsContent.innerHTML = '';
                  Object.entries(gameState.gameData.levels).forEach(([size, data]) => {
                     statsContent.innerHTML += `<div class="p-4 rounded-lg" style="background-color: var(--bg-light);"><h4 class="text-xl font-bold">${size}x${size}</h4><p>Пройдено раз: <span class="font-semibold">${data.completed}</span></p></div>`;
@@ -605,7 +601,6 @@
             }
             
             function renderOtherGames() {
-                // ... (rest of the function is unchanged)
                 const container = document.getElementById('other-games-container');
                 container.innerHTML = '';
                 const games = [
@@ -635,7 +630,6 @@
             }
 
             function updateHintCount() { 
-                // ... (rest of the function is unchanged)
                 const hints = gameState.currentLevel.hints;
                 hintCountEl.textContent = hints; 
                 hintCountEl.classList.remove('hidden');
@@ -666,7 +660,6 @@
             }
             
             function setTheme(theme) {
-                // ... (rest of the function is unchanged)
                 gameState.gameData.theme = theme;
                 document.documentElement.classList.toggle('dark', theme === 'dark');
                 themeToggle.checked = theme === 'dark';
@@ -674,7 +667,6 @@
             }
 
             async function saveGameData() {
-                // ... (rest of the function is unchanged)
                 if (!vkUserId) return;
                 const storageKey = `matrixmind_data_${vkUserId}`;
                 const dataToSave = JSON.stringify(gameState.gameData);
@@ -686,7 +678,6 @@
             }
 
             async function loadGameData() {
-                // ... (rest of the function is unchanged)
                 if (!vkUserId) return;
                 const storageKey = `matrixmind_data_${vkUserId}`;
                 let loadedData = null;
@@ -719,7 +710,6 @@
 
             let rulesAnimationTimeout;
             function animateRules() {
-                // ... (rest of the function is unchanged)
                 clearTimeout(rulesAnimationTimeout);
                 const sumEl = document.getElementById('rules-current-sum');
                 const targetEl = document.getElementById('rules-target');
@@ -748,14 +738,14 @@
                 document.getElementById('tool-eraser').addEventListener('click', () => switchTool('eraser'));
                 
                 document.getElementById('pause-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('pause'); });
-                document.getElementById('resume-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('pause', false); });
-                document.getElementById('restart-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('pause', false); startGame(gameState.currentLevel.size); });
-                document.getElementById('menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('pause', false); renderMenu(); showScreen('mainMenu'); });
-                document.getElementById('next-level-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('win', false); startGame(gameState.currentLevel.size); });
-                document.getElementById('win-menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('win', false); renderMenu(); showScreen('mainMenu'); });
-                document.getElementById('extra-life-btn').addEventListener('click', () => { audioManager.playSound('click'); getReward('life'); });
-                document.getElementById('game-over-restart-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('gameOver', false); startGame(gameState.currentLevel.size); });
-                document.getElementById('game-over-menu-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('gameOver', false); renderMenu(); showScreen('mainMenu'); });
+                document.getElementById('resume-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('pause', false); });
+                document.getElementById('restart-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('pause', false); startGame(gameState.currentLevel.size); });
+                document.getElementById('menu-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('pause', false); renderMenu(); showScreen('mainMenu'); });
+                document.getElementById('next-level-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('win', false); startGame(gameState.currentLevel.size); });
+                document.getElementById('win-menu-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('win', false); renderMenu(); showScreen('mainMenu'); });
+                document.getElementById('extra-life-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); getReward('life'); });
+                document.getElementById('game-over-restart-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('gameOver', false); startGame(gameState.currentLevel.size); });
+                document.getElementById('game-over-menu-btn').addEventListener('click', (e) => { e.currentTarget.blur(); audioManager.playSound('click'); showModal('gameOver', false); renderMenu(); showScreen('mainMenu'); });
                 document.getElementById('rules-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('rules'); animateRules(); });
                 document.getElementById('close-rules-btn').addEventListener('click', () => { audioManager.playSound('click'); showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
                 modals.rules.querySelector('.modal-backdrop').addEventListener('click', () => { showModal('rules', false); clearTimeout(rulesAnimationTimeout); });
@@ -813,4 +803,3 @@
     </script>
 </body>
 </html>
-
