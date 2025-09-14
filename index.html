@@ -210,7 +210,7 @@
 
                 init() {
                     this.clickSynth = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
-                    this.clickSynth.volume.value = -20;
+                    this.clickSynth.volume.value = -22;
 
                     this.winSynth = new Tone.PolySynth(Tone.Synth, {
                          oscillator: { type: 'triangle8' },
@@ -229,11 +229,13 @@
                     if (!this.isReady || gameState.gameData.isMuted) return;
                     try {
                         const now = Tone.now();
-                        if (sound === 'click') this.clickSynth.triggerAttackRelease('C5', '8n', now);
+                        if (sound === 'click') this.clickSynth.triggerAttackRelease('E5', '8n', now);
                         if (sound === 'win') {
-                            const notes = ['C4', 'E4', 'G4', 'C5', 'E5', 'G5'];
-                            notes.forEach((note, i) => {
-                                this.winSynth.triggerAttackRelease(note, '16n', now + i * 0.1);
+                            const notes = ["G4", "B4", "D5", "G5"];
+                            let delay = 0;
+                            notes.forEach(note => {
+                                this.winSynth.triggerAttackRelease(note, "16n", now + delay);
+                                delay += 0.1;
                             });
                         }
                         if (sound === 'error') this.errorSynth.triggerAttackRelease('F#3', '8n', now);
@@ -452,6 +454,7 @@
             }
 
             async function handleHintClick() {
+                audioManager.playSound('click');
                 if (gameState.currentLevel.hints > 0) {
                     gameState.currentLevel.hints--;
                     updateHintCount();
@@ -601,44 +604,33 @@
 
                 levelSizes.forEach((size, index) => {
                     const data = gameState.gameData.levels[size];
-                    const prevSize = index > 0 ? levelSizes[index - 1] : null;
-                    const prevData = prevSize ? gameState.gameData.levels[prevSize] : null;
-
-                    const buttonContainer = document.createElement('div');
-                    buttonContainer.className = 'flex flex-col items-center justify-center';
+                    const prevData = index > 0 ? gameState.gameData.levels[levelSizes[index - 1]] : null;
 
                     const button = document.createElement('button');
                     button.dataset.size = size;
 
                     if (data.unlocked) {
-                        button.className = 'level-btn w-full py-4 rounded-xl font-bold text-lg text-white transition-transform hover:scale-105';
+                        button.className = 'level-btn w-full py-4 rounded-xl font-bold text-lg text-white transition-transform hover:scale-105 h-full flex items-center justify-center';
                         button.style.backgroundColor = 'var(--primary-light)';
                         button.textContent = `${size}x${size}`;
                     } else {
-                        button.className = 'w-full py-4 rounded-xl font-bold text-lg relative';
+                        button.className = 'w-full py-3 h-full rounded-xl font-bold relative flex flex-col items-center justify-center';
                         button.style.backgroundColor = 'var(--locked-bg-light)';
                         button.style.color = 'var(--locked-text-light)';
                         button.disabled = true;
-                        button.innerHTML = `<span class="text-2xl">🔒</span> ${size}x${size}`;
-                    }
 
-                    buttonContainer.appendChild(button);
-
-                    const progressText = document.createElement('p');
-                    progressText.className = 'text-xs font-semibold mt-1';
-                    
-                    const nextSize = index < levelSizes.length - 1 ? levelSizes[index + 1] : null;
-                    const nextLevelIsLocked = nextSize ? !gameState.gameData.levels[nextSize].unlocked : false;
-                    
-                    if (data.unlocked && nextLevelIsLocked) {
-                        progressText.textContent = `Пройдено: ${data.completed}/${LEVELS_TO_UNLOCK}`;
-                        buttonContainer.appendChild(progressText);
-                    } else if (!data.unlocked && prevData) {
-                        progressText.textContent = `${prevData.completed}/${LEVELS_TO_UNLOCK}`;
-                        buttonContainer.appendChild(progressText);
+                        const lockIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="opacity-80"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
+                        
+                        const progressText = prevData ? `<span class="text-xs font-semibold mt-1">${prevData.completed}/${LEVELS_TO_UNLOCK}</span>` : '';
+                        
+                        button.innerHTML = `
+                            ${lockIconSVG}
+                            <span class="text-lg">${size}x${size}</span>
+                            ${progressText}
+                        `;
                     }
                     
-                    levelSelectionContainer.appendChild(buttonContainer);
+                    levelSelectionContainer.appendChild(button);
                 });
             }
             
@@ -814,7 +806,10 @@
                 document.getElementById('sound-toggle-btn').addEventListener('click', () => { audioManager.toggleMute(); audioManager.playSound('click'); });
                 document.getElementById('other-games-container').addEventListener('click', e => {
                     const gameEl = e.target.closest('[data-app-id]');
-                    if (gameEl) vkBridge.send('VKWebAppOpenApp', { app_id: parseInt(gameEl.dataset.appId) });
+                    if (gameEl) {
+                        audioManager.playSound('click');
+                        vkBridge.send('VKWebAppOpenApp', { app_id: parseInt(gameEl.dataset.appId) });
+                    }
                 });
             }
 
@@ -858,3 +853,4 @@
     </script>
 </body>
 </html>
+
