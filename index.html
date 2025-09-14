@@ -296,7 +296,8 @@
                 
                 const fullGrid = document.createElement('div');
                 fullGrid.className = 'grid w-full h-full';
-                const headerSize = 'calc(100% / ' + (size + 1.2) + ')'; // FIX: Adjusted calculation for better fit
+                // FIX: Replaced rigid calculation with a responsive clamp function for header sizes.
+                const headerSize = 'clamp(24px, 10vw, 44px)';
                 fullGrid.style.gridTemplateColumns = `${headerSize} 1fr`;
                 fullGrid.style.gridTemplateRows = `${headerSize} 1fr`;
                 fullGrid.style.gap = '4px';
@@ -808,4 +809,3 @@
     </script>
 </body>
 </html>
-
