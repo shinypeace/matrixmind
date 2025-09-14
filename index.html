@@ -296,22 +296,24 @@
                 
                 const fullGrid = document.createElement('div');
                 fullGrid.className = 'grid w-full h-full';
-                // FIX: Reverted previous change and implemented a more precise calculation that accounts for the 4px gap.
-                const headerSize = 'calc((100% - 4px) / ' + (size + 1) + ')';
+                
+                // FIX: Unified all grid gaps to 1px for consistency and adjusted the calculation.
+                // This prevents rounding and alignment errors that caused overflow.
+                const headerSize = 'calc((100% - 1px) / ' + (size + 1) + ')';
                 fullGrid.style.gridTemplateColumns = `${headerSize} 1fr`;
                 fullGrid.style.gridTemplateRows = `${headerSize} 1fr`;
-                fullGrid.style.gap = '4px';
+                fullGrid.style.gap = '1px';
 
 
                 const colHeadersContainer = document.createElement('div');
                 colHeadersContainer.className = 'grid';
                 colHeadersContainer.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
-                colHeadersContainer.style.gap = '4px';
+                colHeadersContainer.style.gap = '1px';
 
                 const rowHeadersContainer = document.createElement('div');
                 rowHeadersContainer.className = 'grid';
                 rowHeadersContainer.style.gridTemplateRows = `repeat(${size}, 1fr)`;
-                rowHeadersContainer.style.gap = '4px';
+                rowHeadersContainer.style.gap = '1px';
 
                 const gameBoardContainer = document.createElement('div');
                 gameBoardContainer.id = 'game-board';
