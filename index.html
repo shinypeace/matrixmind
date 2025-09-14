@@ -296,8 +296,8 @@
                 
                 const fullGrid = document.createElement('div');
                 fullGrid.className = 'grid w-full h-full';
-                // FIX: Replaced rigid calculation with a responsive clamp function for header sizes.
-                const headerSize = 'clamp(24px, 10vw, 44px)';
+                // FIX: Reverted previous change and implemented a more precise calculation that accounts for the 4px gap.
+                const headerSize = 'calc((100% - 4px) / ' + (size + 1) + ')';
                 fullGrid.style.gridTemplateColumns = `${headerSize} 1fr`;
                 fullGrid.style.gridTemplateRows = `${headerSize} 1fr`;
                 fullGrid.style.gap = '4px';
@@ -809,3 +809,4 @@
     </script>
 </body>
 </html>
+
